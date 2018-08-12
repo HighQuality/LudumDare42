@@ -13,6 +13,8 @@ public:
 
 	void Lost(const Vec2& aLocation);
 
+	const Vec2& GetMousePosition() const { return myWorldMousePos; }
+
 private:
 	void Update(const f32 aDeltaTime);
 	void Draw(sf::RenderTarget& aTarget);

@@ -8,6 +8,7 @@ struct PathData
 	sf::VertexBuffer visualization;
 	std::vector<sf::Vertex> vertices;
 	i32 currentWaypoint = 0;
+	i32 pathEndsAtRunwayIndex = -1;
 };
 
 struct NearPlane
@@ -21,6 +22,7 @@ struct Runway
 	Vec2 start;
 	Vec2 end;
 	f32 width = 0.f;
+	f32 runwayTraceProgress = 0.f;
 };
 
 class Planes
@@ -45,6 +47,8 @@ private:
 	void FollowPath(const i32 aIndex, const f32 aDeltaTime);
 
 	NearPlane FindNearestPlane(const Vec2& aPosition, const i32 aException = -1) const;
+	
+	void CalculateRunwayDistances(const i32 aRunwayIndex, const Vec2& aLocation, f32& aDistanceFromMiddle, f32& aDistanceFromStart);
 
 	i32 myMaxNumberPlanes = 0;
 
@@ -61,4 +65,5 @@ private:
 	std::vector<Runway> myRunways;
 
 	Game* myGame = nullptr;
+	void UpdateRunways();
 };

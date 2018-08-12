@@ -25,6 +25,8 @@ Planes::~Planes()
 
 void Planes::Update(const f32 aDeltaTime)
 {
+	UpdateRunways();
+
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
 	{
 		if (!myOccupied[i])
@@ -118,6 +120,21 @@ NearPlane Planes::FindNearestPlane(const Vec2& aPosition, const i32 aException /
 	return result;
 }
 
+void Planes::CalculateRunwayDistances(const i32 aRunwayIndex, const Vec2& aLocation, f32& aDistanceFromMiddle, f32& aDistanceFromStart)
+{
+	const Runway& runway = myRunways[aRunwayIndex];
+	const Vec2 RunwayStart = runway.start;
+	const Vec2 RunwayEnd = runway.end;
+	const Vec2 RunwayDirection = (RunwayEnd - RunwayStart).GetNormalized();
+	const Vec2 RunwayRight(-RunwayDirection.y, RunwayDirection.x);
+	aDistanceFromStart = (aLocation - RunwayStart).Dot(RunwayDirection);
+	aDistanceFromMiddle = abs((aLocation - RunwayStart).Dot(RunwayRight));
+}
+
+void Planes::UpdateRunways()
+{
+}
+
 void Planes::Draw(sf::RenderTarget& aRender)
 {
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
@@ -193,13 +210,55 @@ void Planes::Dragging(const Vec2& aDragPos)
 			currentWaypoint = pathData.waypoints.back();
 
 		if (aDragPos.DistanceTo(currentWaypoint) > 10.f)
+		{
+			for (i32 iRunway = 0; iRunway < myRunways.size(); ++iRunway)
+			{
+				Runway& runway = myRunways[iRunway];
+				f32 distanceFromMiddle;
+				f32 distanceFromStart;
+				CalculateRunwayDistances(iRunway, aDragPos, distanceFromMiddle, distanceFromStart);
+				
+				if (distanceFromMiddle > runway.width / 2.f)
+				{
+					runway.runwayTraceProgress = 0.f;
+					continue;
+				}
+
+				if (runway.runwayTraceProgress == 0.f)
+				{
+					f32 previousDistanceFromMiddle;
+					f32 previousDistanceFromStart;
+					CalculateRunwayDistances(iRunway, currentWaypoint, previousDistanceFromMiddle, previousDistanceFromStart);
+					// Skip runways we're not currently tracing if we've already 
+					if (previousDistanceFromStart > 0.f)
+						continue;
+				}
+
+				if (distanceFromStart >= runway.runwayTraceProgress)
+				{
+					runway.runwayTraceProgress = distanceFromStart;
+					std::cout << distanceFromStart << std::endl;
+				}
+				else
+				{
+					runway.runwayTraceProgress = 0.f;
+					continue;
+				}
+			}
+
 			pathData.waypoints.push_back(aDragPos);
+		}
 	}
 }
 
 void Planes::EndDrag()
 {
 	myCurrentlyDraggingPlan = -1;
+
+	for (i32 i = 0; i < myRunways.size(); ++i)
+	{
+		myRunways[i].runwayTraceProgress = 0.f;
+	}
 }
 
 void Planes::Resize(const i32 aNewSize)

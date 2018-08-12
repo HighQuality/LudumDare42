@@ -31,6 +31,11 @@ struct Vec2
 		return *this;
 	}
 
+	Vec2 operator-() const
+	{
+		return Vec2(-x, -y);
+	}
+
 	Vec2 operator-(Vec2 aOther) const
 	{
 		return Vec2(x - aOther.x, y - aOther.y);
@@ -113,5 +118,10 @@ struct Vec2
 	f32 DistanceTo(const Vec2& aOther) const
 	{
 		return (*this - aOther).GetLength();
+	}
+	
+	f32 Dot(const Vec2& aOther) const
+	{
+		return x * aOther.x + y * aOther.y;
 	}
 };
