@@ -33,5 +33,7 @@ private:
 	bool isMousePressed = false;
 	bool myLost = false;
 	sf::Sprite myLostOverlay;
+
+	f32 myGameSpeed = 1.f;
 };
 

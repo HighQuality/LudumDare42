@@ -13,7 +13,7 @@ Game::~Game()
 
 void Game::Run()
 {
-	myWindow.create(sf::VideoMode(640, 480), "Plane Z");
+	myWindow.create(sf::VideoMode(640, 480), "Plane Z", sf::Style::Titlebar | sf::Style::Close);
 	myWindow.setKeyRepeatEnabled(false);
 	myWindow.setVerticalSyncEnabled(true);
 
@@ -23,6 +23,9 @@ void Game::Run()
 	
 	sf::Clock stopwatch;
 	f32 deltaTime = 1.f / 60.f;
+
+	f32 timeAccumulator = 1.f;
+	f32 timeStep = 1.f / 150.f;
 
 	while (myWindow.isOpen())
 	{
@@ -35,7 +38,12 @@ void Game::Run()
 		if (wasMousePressed)
 			myPlanes->Dragging(myWorldMousePos);
 
-		Update(deltaTime);
+		timeAccumulator += deltaTime * myGameSpeed;
+		while (timeAccumulator >= timeStep)
+		{
+			Update(timeStep);
+			timeAccumulator -= timeStep;
+		}
 
 		myWindow.clear(sf::Color(6, 158, 69));
 		Draw(myWindow);
@@ -99,8 +107,35 @@ void Game::ProcessEvent(const sf::Event& aEvent)
 		break;
 
 	case sf::Event::KeyPressed:
-		if (aEvent.key.code == sf::Keyboard::Key::F2)
+		switch (aEvent.key.code)
+		{
+		case sf::Keyboard::Key::Num1:
+			myGameSpeed = 1.f;
+			break;
+		case sf::Keyboard::Key::Num2:
+			myGameSpeed = 2.f;
+			break;
+		case sf::Keyboard::Key::Num3:
+			myGameSpeed = 3.f;
+			break;
+		case sf::Keyboard::Key::Num4:
+			myGameSpeed = 4.f;
+			break;
+		case sf::Keyboard::Key::Num5:
+			myGameSpeed = 5.f;
+			break;
+		case sf::Keyboard::Key::Num6:
+			myGameSpeed = 6.f;
+			break;
+		case sf::Keyboard::Key::Num7:
+			myGameSpeed = 7.f;
+			break;
+
+		case sf::Keyboard::Key::F2:
 			gDebugDrawing = !gDebugDrawing;
+			break;
+		}
+
 		break;
 	}
 }

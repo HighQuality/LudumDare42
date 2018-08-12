@@ -14,9 +14,6 @@ Planes::Planes(Game* aGame)
 	runway.end = Vec2(665.f, -30.f);
 	runway.width = 90.f;
 	myRunways.push_back(runway);
-
-	for (i32 i = 0; i < 3; ++i)
-		CreatePlane();
 }
 
 Planes::~Planes()
@@ -25,7 +22,31 @@ Planes::~Planes()
 
 void Planes::Update(const f32 aDeltaTime)
 {
-	UpdateRunways();
+	timeUntilNextPlane -= aDeltaTime;
+
+	if (timeUntilNextPlane < 0.f)
+	{
+		i32 it = 0;
+		while (it < 100)
+		{
+			const Vec2 spawn = GetRandomPlaneSpawn();
+			NearPlane plane = FindNearestPlane(spawn);
+			if (plane.distance > 150.f)
+			{
+				i32 plane = CreatePlane();
+				myPosition[plane] = spawn;
+
+				Vec2 randomTarget(RandomRange(200.f, 640.f - 200.f), RandomRange(200.f, 480.f - 200.f));
+				myDirection[plane] = (randomTarget - myPosition[plane]).GetNormalized();
+
+				break;
+			}
+
+			++it;
+		}
+
+		timeUntilNextPlane = 4.f;
+	}
 
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
 	{
@@ -63,7 +84,24 @@ void Planes::Update(const f32 aDeltaTime)
 		if (!myOccupied[i])
 			continue;
 
-		myPosition[i] += myDirection[i] * mySpeed[i] * aDeltaTime;
+		Vec2& pos = myPosition[i];
+
+		pos += myDirection[i] * mySpeed[i] * aDeltaTime;
+
+		// Only screen-wrap if we haven't landed
+		if (myLandingProgress[i] == 0.f)
+		{
+			const f32 radius = myPlaneRadius[i] * 2.f;
+		
+			if (pos.x < -radius)
+				pos.x = 640.f + radius;
+			else if (pos.x >= 640.f + radius)
+				pos.x = -radius;
+			if (pos.y < -radius)
+				pos.y = 480.f + radius;
+			else if (pos.y >= 480.f + radius)
+				pos.y = -radius;
+		}
 	}
 
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
@@ -78,6 +116,9 @@ void Planes::Update(const f32 aDeltaTime)
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
 	{
 		if (!myOccupied[i])
+			continue;
+
+		if (myLandingProgress[i] > 0.f)
 			continue;
 
 		NearPlane plane = FindNearestPlane(myPosition[i], i);
@@ -167,8 +208,23 @@ void Planes::CalculateRunwayDistances(const i32 aRunwayIndex, const Vec2& aLocat
 	aDistanceFromMiddle = abs((aLocation - RunwayStart).Dot(RunwayRight));
 }
 
-void Planes::UpdateRunways()
+Vec2 Planes::GetRandomPlaneSpawn()
 {
+	switch (RandomRange(0, 3))
+	{
+	case 0:
+		return Vec2(RandomRange(10.f, 630.f), -50.f);
+	case 1:
+		return Vec2(RandomRange(10.f, 630.f), 480.f + 50.f);
+	case 2:
+		return Vec2(-50.f, RandomRange(10.f, 470.f));
+	case 3:
+		return Vec2(640.f + 50.f, RandomRange(10.f, 470.f));
+
+		// silly fallback
+	default:
+		return GetRandomPlaneSpawn();
+	}
 }
 
 void Planes::Draw(sf::RenderTarget& aRender)
@@ -193,9 +249,22 @@ void Planes::Draw(sf::RenderTarget& aRender)
 			aRender.draw(data.visualization, 0, data.visualization.getVertexCount());
 	}
 
+	// Render planes that have landed
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
 	{
 		if (!myOccupied[i])
+			continue;
+		if (myLandingProgress[i] == 0.f)
+			continue;
+		aRender.draw(mySprite[i]);
+	}
+
+	// Render planes that haven't landed
+	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
+	{
+		if (!myOccupied[i])
+			continue;
+		if (myLandingProgress[i] > 0.f)
 			continue;
 		aRender.draw(mySprite[i]);
 	}
@@ -285,7 +354,7 @@ void Planes::Dragging(const Vec2& aDragPos)
 				{
 					runway.runwayTraceProgress = distanceFromStart;
 
-					if (runway.runwayTraceProgress >= 100.f)
+					if (runway.runwayTraceProgress >= 50.f)
 					{
 						pathData.waypoints.push_back(runway.end);
 						runway.runwayTraceProgress = 0.f;
@@ -387,10 +456,6 @@ void Planes::InitializePlane(i32 aIndex)
 	shadowSprite.setColor(sf::Color(0, 0, 0, 64));
 
 	myPlaneRadius[aIndex] = Vec2(sf::Vector2f(sprite.getTexture()->getSize())).GetLength() * 0.5f * 0.9f * (planeSize / 2.f);
-
-	myPosition[aIndex].x = RandomRange(0.f, 640.f);
-	myPosition[aIndex].y = RandomRange(0.f, 480.f);
-	myDirection[aIndex] = Vec2(1.f, 0.f).GetRotated(RandomRange(0.f, 360.f));
 
 	const f32 MinSpeed = 25.f;
 	const f32 MaxSpeed = 50.f;

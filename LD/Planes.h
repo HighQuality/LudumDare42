@@ -50,6 +50,8 @@ private:
 	
 	void CalculateRunwayDistances(const i32 aRunwayIndex, const Vec2& aLocation, f32& aDistanceFromMiddle, f32& aDistanceFromStart);
 
+	Vec2 GetRandomPlaneSpawn();
+
 	i32 myMaxNumberPlanes = 0;
 
 	i32 myCurrentlyDraggingPlan = -1;
@@ -67,6 +69,7 @@ private:
 
 	std::vector<Runway> myRunways;
 
+	f32 timeUntilNextPlane = 2.f;
+
 	Game* myGame = nullptr;
-	void UpdateRunways();
 };
