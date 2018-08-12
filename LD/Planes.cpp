@@ -45,7 +45,23 @@ void Planes::Update(const f32 aDeltaTime)
 			++it;
 		}
 
-		timeUntilNextPlane = 4.f;
+		i32 score = myGame->GetScore();
+		if (score < 5)
+		{
+			timeUntilNextPlane = 6.f;
+		}
+		else if (score < 40)
+		{
+			timeUntilNextPlane = ScaleDifficulty(6.f, 3.f, 5, 40);
+		}
+		else if (score < 100)
+		{
+			timeUntilNextPlane = ScaleDifficulty(3.f, 1.8f, 40, 100);
+		}
+		else
+		{
+			timeUntilNextPlane = ScaleDifficulty(1.8f, 1.f, 100, 200);
+		}
 	}
 
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
@@ -73,7 +89,7 @@ void Planes::Update(const f32 aDeltaTime)
 			}
 
 			const f32 planeSize = myPlaneSize[i] * (1.f - (0.2f * landingProgress));
-			const f32 horizontalScale = (1.f + sinf(HalfPi + landingProgress * TwoPi)) / 2.f * 0.3f + 0.7f;
+			const f32 horizontalScale = (1.f + sinf(HalfPi + landingProgress * TwoPi)) / 2.f * 0.4f + 0.6f;
 			mySprite[i].setScale(sf::Vector2f(planeSize * horizontalScale, planeSize));
 			myShadowSprite[i].setScale(sf::Vector2f(planeSize * horizontalScale, planeSize));
 		}
@@ -92,7 +108,7 @@ void Planes::Update(const f32 aDeltaTime)
 		if (myLandingProgress[i] == 0.f)
 		{
 			const f32 radius = myPlaneRadius[i] * 2.f;
-		
+
 			if (pos.x < -radius)
 				pos.x = 640.f + radius;
 			else if (pos.x >= 640.f + radius)
@@ -157,9 +173,11 @@ void Planes::FollowPath(const i32 aIndex, const f32 aDeltaTime)
 		for (i32 i = 0; i < buffer.size(); ++i)
 		{
 			buffer[i].position = data.waypoints[data.currentWaypoint + i];
-			buffer[i].color = sf::Color::White;
+			buffer[i].color = data.visualizationColor;
 			buffer[i].texCoords = sf::Vector2f(0.f, 0.f);
 		}
+		if (buffer.size() > 0)
+			buffer[0].position = myPosition[aIndex];
 		data.visualization.create(buffer.size());
 		data.visualization.update(buffer.data(), buffer.size(), 0);
 	}
@@ -306,11 +324,13 @@ void Planes::Draw(sf::RenderTarget& aRender)
 void Planes::BeginDrag(const Vec2& aDragPos)
 {
 	NearPlane plane = FindNearestPlane(aDragPos, -1);
-	if (plane.plane >= 0 && plane.distance <= 10.f)
+	if (plane.plane >= 0 && plane.distance <= 30.f)
 	{
 		myCurrentlyDraggingPlan = plane.plane;
 		myPathData[myCurrentlyDraggingPlan].currentWaypoint = 0;
 		myPathData[myCurrentlyDraggingPlan].runwayPathIndex = -1;
+		myPathData[myCurrentlyDraggingPlan].visualizationColor = sf::Color(0, 0, 0, 255);
+		myPathData[myCurrentlyDraggingPlan].visualization.create(0);
 		myPathData[myCurrentlyDraggingPlan].waypoints.clear();
 	}
 }
@@ -359,6 +379,7 @@ void Planes::Dragging(const Vec2& aDragPos)
 						pathData.waypoints.push_back(runway.end);
 						runway.runwayTraceProgress = 0.f;
 						pathData.runwayPathIndex = Max(0, static_cast<i32>(pathData.waypoints.size()) - 2);
+						pathData.visualizationColor = sf::Color::Cyan;
 						myCurrentlyDraggingPlan = -1;
 						return;
 					}
@@ -383,6 +404,19 @@ void Planes::EndDrag()
 	{
 		myRunways[i].runwayTraceProgress = 0.f;
 	}
+}
+
+f32 Planes::ScaleDifficulty(f32 aFrom, f32 aTo, f32 aNumScoreStart, f32 aNumScoreEnd) const
+{
+	f32 score = static_cast<f32>(myGame->GetScore());
+	if (score >= aNumScoreEnd)
+		return aTo;
+	if (score <= aNumScoreStart)
+		return aFrom;
+	f32 deltaValue = aTo - aFrom;
+	f32 deltaScore = static_cast<f32>(aNumScoreEnd - aNumScoreStart);
+	f32 scoreProgress = (score - aNumScoreStart) / deltaScore;
+	return aFrom + deltaValue * scoreProgress;
 }
 
 void Planes::Resize(const i32 aNewSize)
@@ -457,7 +491,8 @@ void Planes::InitializePlane(i32 aIndex)
 
 	myPlaneRadius[aIndex] = Vec2(sf::Vector2f(sprite.getTexture()->getSize())).GetLength() * 0.5f * 0.9f * (planeSize / 2.f);
 
-	const f32 MinSpeed = 25.f;
-	const f32 MaxSpeed = 50.f;
+	const f32 MinSpeed = 30.f;
+	const f32 MaxSpeed = 45.f;
 	mySpeed[aIndex] = RandomRange(MinSpeed, MaxSpeed);
+	mySpeed[aIndex] *= ScaleDifficulty(1.f, 1.8f, 0, 200);
 }

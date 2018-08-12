@@ -9,6 +9,7 @@ struct PathData
 	std::vector<sf::Vertex> vertices;
 	i32 currentWaypoint = 0;
 	i32 runwayPathIndex = -1;
+	sf::Color visualizationColor = sf::Color(0, 0, 0, 255);
 };
 
 struct NearPlane
@@ -37,6 +38,10 @@ public:
 	void BeginDrag(const Vec2& aDragPos);
 	void Dragging(const Vec2& aDragPos);
 	void EndDrag();
+
+	bool IsDragging()const { return myCurrentlyDraggingPlan >= 0; }
+
+	f32 ScaleDifficulty(f32 aFrom, f32 aTo, f32 aNumScoreStart, f32 aNumScoreEnd) const;
 
 private:
 	void Resize(const i32 aNewSize);

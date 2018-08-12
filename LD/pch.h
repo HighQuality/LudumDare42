@@ -8,6 +8,7 @@
 #include <intrin.h>
 #include <random>
 #include <type_traits>
+#include <sstream>
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
