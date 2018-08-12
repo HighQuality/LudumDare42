@@ -40,6 +40,29 @@ void Planes::Update(const f32 aDeltaTime)
 		if (!myOccupied[i])
 			continue;
 
+		f32& landingProgress = myLandingProgress[i];
+		if (landingProgress > 0.f && landingProgress < 1.f)
+		{
+			landingProgress += aDeltaTime * 0.25f;
+
+			if (landingProgress > 1.f)
+			{
+				landingProgress = 1.f;
+				myGame->Score(myPosition[i]);
+			}
+
+			const f32 planeSize = myPlaneSize[i] * (1.f - (0.2f * landingProgress));
+			const f32 horizontalScale = (1.f + sinf(HalfPi + landingProgress * TwoPi)) / 2.f * 0.3f + 0.7f;
+			mySprite[i].setScale(sf::Vector2f(planeSize * horizontalScale, planeSize));
+			myShadowSprite[i].setScale(sf::Vector2f(planeSize * horizontalScale, planeSize));
+		}
+	}
+
+	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
+	{
+		if (!myOccupied[i])
+			continue;
+
 		myPosition[i] += myDirection[i] * mySpeed[i] * aDeltaTime;
 	}
 
@@ -56,7 +79,7 @@ void Planes::Update(const f32 aDeltaTime)
 	{
 		if (!myOccupied[i])
 			continue;
-		
+
 		NearPlane plane = FindNearestPlane(myPosition[i], i);
 		if (plane.plane >= 0 && plane.distance < myPlaneRadius[i])
 		{
@@ -74,13 +97,18 @@ void Planes::FollowPath(const i32 aIndex, const f32 aDeltaTime)
 		Vec2 delta = data.waypoints[data.currentWaypoint] - myPosition[aIndex];
 		f32 distance = delta.GetLength();
 
-		if (distance > 3.f)
+		if (distance > 5.f)
 		{
 			myDirection[aIndex] = delta / distance;
 		}
 		else
 		{
 			++data.currentWaypoint;
+
+			if (data.currentWaypoint == data.runwayPathIndex)
+			{
+				myLandingProgress[aIndex] = Max(0.001f, aDeltaTime);
+			}
 		}
 
 		std::vector<sf::Vertex> buffer;
@@ -94,6 +122,11 @@ void Planes::FollowPath(const i32 aIndex, const f32 aDeltaTime)
 		data.visualization.create(buffer.size());
 		data.visualization.update(buffer.data(), buffer.size(), 0);
 	}
+
+	if (data.currentWaypoint >= data.waypoints.size() && myLandingProgress[aIndex] > 0.f)
+	{
+		myOccupied[aIndex] = false;
+	}
 }
 
 NearPlane Planes::FindNearestPlane(const Vec2& aPosition, const i32 aException /*= -1*/) const
@@ -104,16 +137,19 @@ NearPlane Planes::FindNearestPlane(const Vec2& aPosition, const i32 aException /
 	{
 		if (!myOccupied[i] || i == aException)
 			continue;
-		
+		// Skip planes that are in the process of landing
+		if (myLandingProgress[i] > 0.f)
+			continue;
+
 		const f32 distanceSquared = Max(0.f, (aPosition - myPosition[i]).GetLengthSquared() - myPlaneRadius[i] * myPlaneRadius[i]);
-		
+
 		if (distanceSquared < minimumDistanceSquared)
 		{
 			minimumDistanceSquared = distanceSquared;
 			foundPlane = i;
 		}
 	}
-	
+
 	NearPlane result;
 	result.plane = foundPlane;
 	result.distance = std::sqrtf(minimumDistanceSquared);
@@ -137,6 +173,16 @@ void Planes::UpdateRunways()
 
 void Planes::Draw(sf::RenderTarget& aRender)
 {
+	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
+	{
+		if (!myOccupied[i])
+			continue;
+		sf::Sprite& shadowSprite = myShadowSprite[i];
+		shadowSprite.setRotation(mySprite[i].getRotation());
+		shadowSprite.setPosition(myPosition[i] + sf::Vector2f(20, 20.f) * (1.f - myLandingProgress[i]));
+		aRender.draw(shadowSprite);
+	}
+
 	for (i32 i = 0; i < myMaxNumberPlanes; ++i)
 	{
 		if (!myOccupied[i])
@@ -191,10 +237,11 @@ void Planes::Draw(sf::RenderTarget& aRender)
 void Planes::BeginDrag(const Vec2& aDragPos)
 {
 	NearPlane plane = FindNearestPlane(aDragPos, -1);
-	if (plane.plane >=0 && plane.distance <= 10.f)
+	if (plane.plane >= 0 && plane.distance <= 10.f)
 	{
 		myCurrentlyDraggingPlan = plane.plane;
 		myPathData[myCurrentlyDraggingPlan].currentWaypoint = 0;
+		myPathData[myCurrentlyDraggingPlan].runwayPathIndex = -1;
 		myPathData[myCurrentlyDraggingPlan].waypoints.clear();
 	}
 }
@@ -217,7 +264,7 @@ void Planes::Dragging(const Vec2& aDragPos)
 				f32 distanceFromMiddle;
 				f32 distanceFromStart;
 				CalculateRunwayDistances(iRunway, aDragPos, distanceFromMiddle, distanceFromStart);
-				
+
 				if (distanceFromMiddle > runway.width / 2.f)
 				{
 					runway.runwayTraceProgress = 0.f;
@@ -237,7 +284,15 @@ void Planes::Dragging(const Vec2& aDragPos)
 				if (distanceFromStart >= runway.runwayTraceProgress)
 				{
 					runway.runwayTraceProgress = distanceFromStart;
-					std::cout << distanceFromStart << std::endl;
+
+					if (runway.runwayTraceProgress >= 100.f)
+					{
+						pathData.waypoints.push_back(runway.end);
+						runway.runwayTraceProgress = 0.f;
+						pathData.runwayPathIndex = Max(0, static_cast<i32>(pathData.waypoints.size()) - 2);
+						myCurrentlyDraggingPlan = -1;
+						return;
+					}
 				}
 				else
 				{
@@ -272,15 +327,14 @@ void Planes::Resize(const i32 aNewSize)
 	myDirection.resize(aNewSize);
 	mySpeed.resize(aNewSize);
 	mySprite.resize(aNewSize);
+	myShadowSprite.resize(aNewSize);
 	myPathData.resize(aNewSize);
 	myPlaneRadius.resize(aNewSize);
+	myLandingProgress.resize(aNewSize);
+	myPlaneSize.resize(aNewSize);
 
 	for (i32 i = myMaxNumberPlanes; i < aNewSize; ++i)
-	{
 		myOccupied[i] = false;
-		myPlaneRadius[i] = 0.f;
-		mySpeed[i] = 0.f;
-	}
 }
 
 i32 Planes::CreatePlane()
@@ -314,13 +368,23 @@ void Planes::InitializePlane(i32 aIndex)
 {
 	myOccupied[aIndex] = true;
 	myPathData[aIndex].visualization.setPrimitiveType(sf::LineStrip);
-	
+	myPlaneRadius[aIndex] = 0.f;
+	mySpeed[aIndex] = 0.f;
+	myLandingProgress[aIndex] = 0.f;
+
 	const f32 planeSize = 2.5f;
+	myPlaneSize[aIndex] = planeSize;
 
 	sf::Sprite& sprite = mySprite[aIndex];
 	sprite.setTexture(gResources->planeTexture);
 	sprite.setOrigin(sf::Vector2f(sprite.getTexture()->getSize()) * 0.5f);
 	sprite.setScale(sf::Vector2f(planeSize, planeSize));
+
+	sf::Sprite& shadowSprite = myShadowSprite[aIndex];
+	shadowSprite.setTexture(*sprite.getTexture());
+	shadowSprite.setOrigin(sf::Vector2f(shadowSprite.getTexture()->getSize()) * 0.5f);
+	shadowSprite.setScale(sf::Vector2f(planeSize, planeSize));
+	shadowSprite.setColor(sf::Color(0, 0, 0, 64));
 
 	myPlaneRadius[aIndex] = Vec2(sf::Vector2f(sprite.getTexture()->getSize())).GetLength() * 0.5f * 0.9f * (planeSize / 2.f);
 

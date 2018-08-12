@@ -15,6 +15,7 @@ void Game::Run()
 {
 	myWindow.create(sf::VideoMode(640, 480), "Plane Z");
 	myWindow.setKeyRepeatEnabled(false);
+	myWindow.setVerticalSyncEnabled(true);
 
 	CHECK(!gResources && "Only one game instance is supported at a time");
 	
@@ -61,6 +62,11 @@ void Game::Lost(const Vec2& aLocation)
 {
 	myLostOverlay.setPosition(aLocation);
 	myLost = true;
+}
+
+void Game::Score(const Vec2& aPosition)
+{
+	std::cout << "score" << std::endl;
 }
 
 void Game::ProcessEvent(const sf::Event& aEvent)

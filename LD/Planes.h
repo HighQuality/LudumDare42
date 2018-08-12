@@ -8,7 +8,7 @@ struct PathData
 	sf::VertexBuffer visualization;
 	std::vector<sf::Vertex> vertices;
 	i32 currentWaypoint = 0;
-	i32 pathEndsAtRunwayIndex = -1;
+	i32 runwayPathIndex = -1;
 };
 
 struct NearPlane
@@ -59,7 +59,10 @@ private:
 	std::vector<Vec2> myDirection;
 	std::vector<f32> mySpeed;
 	std::vector<f32> myPlaneRadius;
+	std::vector<f32> myLandingProgress;
+	std::vector<f32> myPlaneSize;
 	std::vector<sf::Sprite> mySprite;
+	std::vector<sf::Sprite> myShadowSprite;
 	std::vector<PathData> myPathData;
 
 	std::vector<Runway> myRunways;

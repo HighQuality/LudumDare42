@@ -15,6 +15,8 @@ public:
 
 	const Vec2& GetMousePosition() const { return myWorldMousePos; }
 
+	void Score(const Vec2& aPosition);
+
 private:
 	void Update(const f32 aDeltaTime);
 	void Draw(sf::RenderTarget& aTarget);
